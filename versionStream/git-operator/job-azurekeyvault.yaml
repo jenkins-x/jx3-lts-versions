@@ -32,33 +32,17 @@ spec:
         workingDir: /workspace
       containers:
       - args:
-        - make apply || make failed
+        - apply
         command:
-        - /bin/sh
-        - -c
+        - make
         env:
         - name: XDG_CONFIG_HOME
           value: /workspace/xdg_config
-        - name: JX_SECRET_SIDECAR
-          value: gsm
-        - name: JX_SECRET_TMP_DIR
-          value: /workspace/source/.jx-secrets
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
+        - name: AZURE_AD_RESOURCE
+          value: https://vault.azure.net
         image: gcr.io/jenkinsxio/jx-boot:3.1.6
         imagePullPolicy: Always
         name: job
-        volumeMounts:
-        - mountPath: /workspace
-          name: workspace-volume
-        workingDir: /workspace/source
-      - command:
-        - versionStream/src/wait-for-complete.sh
-        image: google/cloud-sdk:slim
-        imagePullPolicy: Always
-        name: gsm
         volumeMounts:
         - mountPath: /workspace
           name: workspace-volume
