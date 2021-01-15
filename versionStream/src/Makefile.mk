@@ -1,7 +1,7 @@
 FETCH_DIR := build/base
 TMP_TEMPLATE_DIR := build/tmp
 OUTPUT_DIR := config-root
-
+KUBEAPPLY ?= kubectl-apply
 VAULT_ADDR ?= https://vault.secret-infra:8200
 
 # You can disable force mode on kubectl apply by modifying this line:
@@ -42,6 +42,9 @@ fetch: init
 	# lets configure the cluster gitops repository URL on the requirements if its missing
 	jx gitops repository resolve --source-dir $(OUTPUT_DIR)/namespaces
 
+	# lets generate any jenkins job-values.yaml files to import projects into Jenkins
+	jx gitops jenkins jobs
+
 	# set any missing defaults in the secrets mapping file
 	jx secret convert edit
 
@@ -54,11 +57,9 @@ fetch: init
 	# this line avoids the next helmfile command failing...
 	helm repo add jx http://chartmuseum.jenkins-x.io
 
-	#sleep infinity
 	# generate the yaml from the charts in helmfile.yaml and moves them to the right directory tree (cluster or namespaces/foo)
-	#jx gitops helmfile template $(HELMFILE_TEMPLATE_FLAGS) --args="--values=/workspace/source/jx-values.yaml --values=/workspace/source/versionStream/src/fake-secrets.yaml.gotmpl --values=/workspace/source/imagePullSecrets.yaml" --output-dir $(OUTPUT_DIR)
 	helmfile --file helmfile.yaml template --include-crds --output-dir-template /tmp/generate/{{.Release.Namespace}}
-	
+
 	jx gitops split --dir /tmp/generate
 	jx gitops rename --dir /tmp/generate
 	jx gitops helmfile move --output-dir config-root --dir /tmp/generate
@@ -72,10 +73,6 @@ fetch: init
 
 	# lets make sure all the namespaces exist for environments of the replicated secrets
 	jx gitops namespace --dir-mode --dir $(OUTPUT_DIR)/namespaces
-
-	# lets publish the requirements metadata into the dev Environment.Spec.TeamSettings.BootRequirements so its easy to access them via CRDs
-	# we dont use team settings on the dev environment anymore so maybe we can get rid of this?
-	# jx gitops requirements publish
 
 .PHONY: build
 # uncomment this line to enable kustomize
@@ -104,12 +101,16 @@ post-build:
 	jx gitops label --dir $(OUTPUT_DIR)/customresourcedefinitions gitops.jenkins-x.io/pipeline=customresourcedefinitions
 	jx gitops label --dir $(OUTPUT_DIR)/namespaces                gitops.jenkins-x.io/pipeline=namespaces
 
+	# lets add kapp friendly change group identifiers to nginx-ingress and pusher-wave so we can write rules against them
+	jx gitops annotate --dir $(OUTPUT_DIR) --selector app=pusher-wave kapp.k14s.io/change-group=apps.jenkins-x.io/pusher-wave
+	jx gitops annotate --dir $(OUTPUT_DIR) --selector app.kubernetes.io/name=ingress-nginx kapp.k14s.io/change-group=apps.jenkins-x.io/ingress-nginx
+
 	# lets label all Namespace resources with the main namespace which creates them and contains the Environment resources
 	jx gitops label --dir $(OUTPUT_DIR)/cluster --kind=Namespace team=jx
 
 	# lets enable pusher-wave to perform rolling updates of any Deployment when its underlying Secrets get modified
 	# by modifying the underlying secret store (e.g. vault / GSM / ASM) which then causes External Secrets to modify the k8s Secrets
-	jx gitops annotate --dir  $(OUTPUT_DIR)/namespaces --kind Deployment wave.pusher.com/update-on-config-change=true
+	jx gitops annotate --dir  $(OUTPUT_DIR)/namespaces --kind Deployment --selector app=pusher-wave --invert-selector wave.pusher.com/update-on-config-change=true
 
 	# lets force a rolling upgrade of lighthouse pods whenever we update the lighthouse config...
 	jx gitops hash -s config-root/namespaces/jx/lighthouse-config/config-cm.yaml -s config-root/namespaces/jx/lighthouse-config/plugins-cm.yaml -d config-root/namespaces/jx/lighthouse
@@ -151,7 +152,7 @@ verify-ignore: verify-ingress-ignore
 secrets-populate:
 	# lets populate any missing secrets we have a generator in `charts/repoName/chartName/secret-schema.yaml`
 	# they can be modified/regenerated at any time via `jx secret edit`
-	-VAULT_ADDR=$(VAULT_ADDR) jx secret populate -n jx
+	-VAULT_ADDR=$(VAULT_ADDR) jx secret populate
 
 .PHONY: secrets-wait
 secrets-wait:
@@ -169,7 +170,7 @@ regen-check:
 	jx gitops apply
 
 .PHONY: regen-phase-1
-regen-phase-1: git-setup resolve-metadata all kubectl-apply verify-ingress-ignore commit
+regen-phase-1: git-setup resolve-metadata all $(KUBEAPPLY) verify-ingress-ignore commit
 
 .PHONY: regen-phase-2
 regen-phase-2: verify-ingress-ignore all verify-ignore secrets-populate commit
@@ -177,8 +178,12 @@ regen-phase-2: verify-ingress-ignore all verify-ignore secrets-populate commit
 .PHONY: regen-phase-3
 regen-phase-3: push secrets-wait
 
+.PHONY: regen-none
+regen-none:
+	# we just merged a PR so lets perform any extra checks after the merge but before the kubectl apply
+
 .PHONY: apply
-apply: regen-check kubectl-apply verify write-completed
+apply: regen-check kubectl-apply secrets-populate verify write-completed
 
 .PHONY: write-completed
 write-completed:
@@ -195,6 +200,14 @@ kubectl-apply:
 	kubectl apply $(KUBECTL_APPLY_FLAGS) --prune -l=gitops.jenkins-x.io/pipeline=customresourcedefinitions -R -f $(OUTPUT_DIR)/customresourcedefinitions
 	kubectl apply $(KUBECTL_APPLY_FLAGS) --prune -l=gitops.jenkins-x.io/pipeline=cluster                   -R -f $(OUTPUT_DIR)/cluster
 	kubectl apply $(KUBECTL_APPLY_FLAGS) --prune -l=gitops.jenkins-x.io/pipeline=namespaces                -R -f $(OUTPUT_DIR)/namespaces
+
+	# lets apply any infrastructure specific labels or annotations to enable IAM roles on ServiceAccounts etc
+	jx gitops postprocess
+
+.PHONY: kapp-apply
+kapp-apply:
+
+	kapp deploy -a jx -f $(OUTPUT_DIR) -y
 
 	# lets apply any infrastructure specific labels or annotations to enable IAM roles on ServiceAccounts etc
 	jx gitops postprocess
