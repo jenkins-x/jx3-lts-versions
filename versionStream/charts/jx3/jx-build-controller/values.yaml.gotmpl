@@ -8,7 +8,14 @@ serviceaccount:
     eks.amazonaws.com/role-arn: arn:aws:iam::{{ .Values.jxRequirements.cluster.project }}:role/{{ .Values.jxRequirements.cluster.clusterName }}-build-ctrl
 {{- end }}
 
-{{- if eq .Values.jxRequirements.cluster.provider "eks" }}
 env:
+{{- if eq .Values.jxRequirements.cluster.provider "eks" }}
   AWS_REGION: {{ .Values.jxRequirements.cluster.region }}
+{{ else if eq .Values.jxRequirements.cluster.provider "aks" }}
+  {{ if hasKey .Values.jxRequirements.cluster.azure "storage" }}
+    {{ if hasKey .Values.jxRequirements.cluster.azure.storage "storageAccountName" }}
+  AZURE_STORAGE_ACCOUNT: {{ .Values.jxRequirements.cluster.azure.storage.storageAccountName }}
+    {{- end }}
+  {{- end }}
 {{- end }}
+  GIT_SECRET_SERVER: {{ .Values.jxRequirements.cluster.gitServer }}
