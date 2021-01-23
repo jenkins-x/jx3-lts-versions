@@ -7,13 +7,13 @@ echo "promoting changes in jx3-gitops-template to downstream templates"
 
 declare -a repos=(
   # local
-  "jx3-kubernetes" "jx3-kind-vault" "jx3-minikube" "jx3-docker-vault"
+  "jx3-kubernetes" "jx3-kubernetes-istio" "jx3-kind-vault" "jx3-minikube" "jx3-docker-vault"
   # GKE
-  "jx3-gke-vault" "jx3-gke-gsm" "jx3-gke-gcloud-vault" 
+  "jx3-gke-vault" "jx3-gke-gsm" "jx3-gke-gcloud-vault"
   # EKS
   "jx3-eks-terraform-vault" "jx3-eks-vault"
   # Azure
-  "jx3-azure-terraform"
+  "jx3-azure-vault" "jx3-azure-akv"
   # OpenShift
   "jx3-openshift" "jx3-openshift-crc"
 )
@@ -34,6 +34,7 @@ do
   kpt pkg get https://github.com/jenkins-x/jxr-versions.git/ versionStream
   rm -rf versionStream/jenkins*.yml versionStream/jx versionStream/.github versionStream/.pre* versionStream/.secrets* versionStream/OWNER* versionStream/.lighthouse
   jx gitops helmfile resolve --update
+  jx gitops helmfile report
   git add * .lighthouse || true
   git commit -a -m "chore: upgrade version stream" || true
   git push || true
