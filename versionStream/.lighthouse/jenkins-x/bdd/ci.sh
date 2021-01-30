@@ -25,6 +25,15 @@ jx secret --help
 
 
 
+if [ -z "$WORKING_DIR" ]
+then
+    export WORKING_DIR="/workspace"
+fi
+
+if [ -z "$JX_ADD_CUSTOM_RESOURCES" ]
+then
+    export JX_ADD_CUSTOM_RESOURCES="echo no custom resources being created"
+fi
 
 if [ -z "$GIT_USERNAME" ]
 then
@@ -90,7 +99,7 @@ echo "using the version stream url $PR_SOURCE_URL ref: $PULL_PULL_SHA"
 export GITOPS_TEMPLATE_URL="https://github.com/${GITOPS_TEMPLATE_PROJECT}.git"
 
 # lets find the current template  version
-export GITOPS_TEMPLATE_VERSION=$(grep  'version: ' /workspace/source/git/github.com/$GITOPS_TEMPLATE_PROJECT.yml | awk '{ print $2}')
+export GITOPS_TEMPLATE_VERSION=$(grep  'version: ' ${WORKING_DIR}/source/git/github.com/$GITOPS_TEMPLATE_PROJECT.yml | awk '{ print $2}')
 
 echo "using GitOps template: $GITOPS_TEMPLATE_URL version: $GITOPS_TEMPLATE_VERSION"
 
@@ -98,17 +107,19 @@ echo "using GitOps template: $GITOPS_TEMPLATE_URL version: $GITOPS_TEMPLATE_VERS
 #git clone -b v${GITOPS_TEMPLATE_VERSION} $GITOPS_TEMPLATE_URL
 
 # create the boot git repository to mimic creating the git repository via the github create repository wizard
+echo "about to run: jx admin create -b --initial-git-url $GITOPS_TEMPLATE_URL --env dev --env-git-owner=$GH_OWNER --repo env-$CLUSTER_NAME-dev --no-operator $JX_ADMIN_CREATE_ARGS"
 jx admin create -b --initial-git-url $GITOPS_TEMPLATE_URL --env dev --env-git-owner=$GH_OWNER --repo env-$CLUSTER_NAME-dev --no-operator $JX_ADMIN_CREATE_ARGS
 
 
 export GITOPS_REPO=https://${GIT_USERNAME//[[:space:]]}:${GIT_TOKEN}@${GIT_SERVER_HOST}/${GH_OWNER}/env-${CLUSTER_NAME}-dev.git
 
-echo "gitops cluster git repo $GITOPS_REPO"
-
 export SOURCE_DIR=`pwd`
 
+echo "gitops cluster git repo $GITOPS_REPO"
+echo "current source dir: ${SOURCE_DIR} and root workdir: ${WORKING_DIR}"
+
 # avoid cloning cluster repo into the working CI folder
-cd /workspace
+cd ${WORKING_DIR}
 
 # lets git clone the pipeline catalog so we can upgrade to the latest pipelines for the environment...
 #git clone -b beta https://github.com/jstrachan/jx3-pipeline-catalog
@@ -116,6 +127,10 @@ cd /workspace
 git clone -b master $GITOPS_REPO env-dev-repo
 cd env-dev-repo
 
+echo "cloned to ${pwd}"
+ls -al
+
+echo "now removing the local versionStream and copying "
 # use the changes from this PR in the version stream for the cluster repo when resolving the helmfile
 rm -rf versionStream
 cp -R $SOURCE_DIR versionStream
@@ -186,6 +201,14 @@ echo "****************************************"
 
 # lets create the cluster
 $GITOPS_BIN/create.sh
+
+echo "created cluster now creating custom resources"
+
+kubectl get ns
+
+echo "about to execute: $JX_ADD_CUSTOM_RESOURCES"
+
+$JX_ADD_CUSTOM_RESOURCES
 
 # now lets install the operator
 # --username is found from $GIT_USERNAME or git clone URL
