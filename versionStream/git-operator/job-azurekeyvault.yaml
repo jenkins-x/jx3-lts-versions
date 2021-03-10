@@ -24,7 +24,7 @@ spec:
         env:
         - name: XDG_CONFIG_HOME
           value: /workspace/xdg_config
-        image: ghcr.io/jenkins-x/jx-boot:3.1.202
+        image: ghcr.io/jenkins-x/jx-boot:3.1.299
         name: git-clone
         volumeMounts:
         - mountPath: /workspace
@@ -38,13 +38,11 @@ spec:
         env:
         - name: XDG_CONFIG_HOME
           value: /workspace/xdg_config
-        - name: AZURE_AD_RESOURCE
-          value: https://vault.azure.net
         envFrom:
         - secretRef:
             name: jx-boot-job-env-vars
             optional: true
-        image: ghcr.io/jenkins-x/jx-boot:3.1.202
+        image: ghcr.io/jenkins-x/jx-boot:3.1.299
         imagePullPolicy: Always
         name: job
         volumeMounts:
