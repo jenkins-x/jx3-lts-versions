@@ -33,9 +33,15 @@ repositories:
 - prefix: jx3
   urls:
   - https://storage.googleapis.com/jenkinsxio/charts
+- prefix: jxgh
+  urls:
+  - https://jenkins-x-charts.github.io/repo
 - prefix: presslabs
   urls:
   - https://presslabs.github.io/charts
 - prefix: stable
   urls:
   - https://charts.helm.sh/stable
+- prefix: grafana
+  urls:
+  - https://grafana.github.io/helm-charts
