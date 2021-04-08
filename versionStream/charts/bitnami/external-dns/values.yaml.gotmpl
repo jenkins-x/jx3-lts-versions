@@ -36,6 +36,7 @@ serviceAccount:
 
 domainFilters:
 - {{ .Values.jxRequirements.ingress.domain }}
+{{- if hasKey .Values.jxRequirements "environments" }}
 {{- range $key, $val := .Values.jxRequirements.environments }}
 {{- if hasKey $val "ingress" }}
 {{- if $val.ingress.domain }}
@@ -43,4 +44,10 @@ domainFilters:
 {{- end }}
 {{- end }}
 {{- end }}
+{{- end }}
 
+metrics:
+  enabled: true
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "7979"
