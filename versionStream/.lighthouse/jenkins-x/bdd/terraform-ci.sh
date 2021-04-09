@@ -91,7 +91,7 @@ export TERRAFORM_INPUT="-input=false"
 # ensure buckets are cleaned up for CI
 export TF_VAR_force_destroy=true
 
-export PROJECT_ID=jenkins-x-labs-bdd
+export PROJECT_ID=jenkins-x-labs-bdd1
 export CREATED_TIME=$(date '+%a-%b-%d-%Ybin/ main.tf values.auto.tfvars terraform.tfstate variables.tf-%H-%M-%S')
 export CLUSTER_NAME="${BRANCH_NAME,,}-$BUILD_NUMBER-$BDD_NAME"
 export ZONE=europe-west1-c
@@ -143,19 +143,27 @@ else
       #gh auth login --hostname $GIT_SERVER_HOST --with-token $GH_ACCESS_TOKEN
 fi
 
+if [ -z "$GH_CLONE_HOST" ]
+then
+      export GH_CLONE_HOST=${GH_HOST}
+fi
+
 
 $JX_SCM repo create ${GH_HOST}${GH_OWNER}/cluster-$CLUSTER_NAME-dev --template $GIT_TEMPLATE_SERVER_URL/${GITOPS_TEMPLATE_PROJECT} --private --confirm
 sleep 15
-$JX_SCM repo clone ${GH_HOST}${GH_OWNER}/cluster-$CLUSTER_NAME-dev
+$JX_SCM repo clone ${GH_CLONE_HOST}${GH_OWNER}/cluster-$CLUSTER_NAME-dev
 
 pushd `pwd`/cluster-${CLUSTER_NAME}-dev
 
-      git pull origin master
+      git pull origin main
       # use the changes from this PR in the version stream for the cluster repo when resolving the helmfile
       rm -rf versionStream
       cp -R $SOURCE_DIR versionStream
       rm -rf versionStream/.git versionStream/.github
       git add versionStream/
+
+      # lets remove the old files...
+      rm -rf .jx/git-operator/filename.txt
 
       # lets add some testing charts....
       jx gitops helmfile add --chart jx3/jx-test-collector
@@ -165,6 +173,15 @@ pushd `pwd`/cluster-${CLUSTER_NAME}-dev
 
       # lets upgrade any versions in helmfile.yaml
       jx gitops helmfile resolve --update
+
+      # any git repo overrides...
+      if [ -z "$JX_GIT_OVERRIDES" ]
+      then
+          export JX_GIT_OVERRIDES="echo no git overrides"
+      else
+          echo "invoking: ${SOURCE_DIR}/${JX_GIT_OVERRIDES}"
+          ${SOURCE_DIR}/${JX_GIT_OVERRIDES}
+      fi
 
       # lets add a custom pipeline catalog for the test...
       #cp $SOURCE_DIR/.lighthouse/jenkins-x/bdd/pipeline-catalog.yaml extensions
@@ -183,106 +200,28 @@ echo "**  clone and create cloud resources               **"
 echo "**                                                 **"
 echo "*****************************************************"
 
-$JX_SCM repo create ${GH_HOST}${GH_OWNER}/infra-$CLUSTER_NAME-dev --template $GIT_TEMPLATE_SERVER_URL/${GITOPS_INFRA_PROJECT} --private --confirm
-sleep 15
 
-echo "about to run: $JX_SCM repo clone ${GH_HOST}${GH_OWNER}/infra-$CLUSTER_NAME-dev"
-
-$JX_SCM repo clone ${GH_HOST}${GH_OWNER}/infra-$CLUSTER_NAME-dev
-
-########
-# setting up test resources and garbage collect previous runs
-########
-export GITOPS_REPO=https://${GIT_USERNAME//[[:space:]]}:${GIT_TOKEN}@${GIT_SERVER_HOST}/${GH_OWNER}/infra-${CLUSTER_NAME}-dev.git
-
-# lets garbage collect any old tests or previous failed tests of this repo/PR/context...
-echo "for cleaning up cloud resources"
-jx test create --test-url $GITOPS_REPO
-
-# create the cluster
-pushd `pwd`/infra-${CLUSTER_NAME}-dev
-      git pull origin master
-      export GITOPS_DIR=`pwd`
-      export GITOPS_BIN=$GITOPS_DIR/bin
-
-      # lets configure the cluster
-      source $GITOPS_BIN/configure.sh
-
-      # lets create the cluster
-      $GITOPS_BIN/create.sh
-
-      # push state to git repo so we can destroy later
-      # move to a bucket maybe? for now we need to -f to override the .gitignore which isn't good
-      git add terraform.tfstate -f
-      git commit -a -m "chore: terraform destroy details"
-      git fetch origin
-      git rebase origin/master
-      git push
-
-      $(terraform output -raw connect)
-
-      $(terraform output -raw follow_install_logs)
-popd
-
-echo "*********************"
-echo "**                 **"
-echo "**  Run BDD tests  **"
-echo "**                 **"
-echo "*********************"
-
-# # diagnostic commands to test the image's kubectl
-# kubectl version
-
-# # for some reason we need to use the full name once for the second command to work!
-kubectl get environments
-kubectl get env dev -oyaml
-kubectl get cm config -oyaml
-
-export JX_DISABLE_DELETE_APP="true"
-export JX_DISABLE_DELETE_REPO="true"
-
-# increase the timeout for complete PipelineActivity
-export BDD_TIMEOUT_PIPELINE_ACTIVITY_COMPLETE="60"
-
-# we don't yet update the PipelineActivity.spec.pullTitle on previews....
-export BDD_DISABLE_PIPELINEACTIVITY_CHECK="true"
-
-# define variables for the BDD tests
-export GIT_ORGANISATION="$GH_OWNER"
-export GH_USERNAME="$GIT_USERNAME"
-
-# lets turn off color output
-export TERM=dumb
-
-echo "about to run the bdd tests...."
-
-# run the BDD tests
-if [ -z "$RUN_TEST" ]
+if [ -z "$GITOPS_INFRA_PROJECT" ]
 then
-      bddjx -ginkgo.focus=golang -test.v
+      echo "no custom gitops infra repository to be created for this test"
 else
-      $RUN_TEST
+      $JX_SCM repo create ${GH_HOST}${GH_OWNER}/infra-$CLUSTER_NAME-dev --template $GIT_TEMPLATE_SERVER_URL/${GITOPS_INFRA_PROJECT} --private --confirm
+      sleep 15
 fi
 
-echo "completed the bdd tests"
+if [ -z "$TERRAFORM_FILE" ]
+then
+    export TERRAFORM_FILE="terraform.yaml.gotmpl"
+fi
 
-echo "*******************•**"
-echo "**                  **"
-echo "**  Update jx test  **"
-echo "**                  **"
-echo "********************•*"
+if [ -z "$JX_TEST_COMMAND" ]
+then
+  export JX_TEST_COMMAND="jx test create -f /workspace/source/.lighthouse/jenkins-x/bdd/$TERRAFORM_FILE --verify-result"
+fi
 
-echo "switching context back to the infra cluster"
+echo "testing terraform with: $JX_TEST_COMMAND"
 
-# lets connect back to the infra cluster so we can find the TestRun CRDs
-gcloud container clusters get-credentials tf-jx-gentle-titmouse --zone us-central1-a --project jx-labs-infra
+export TF_VAR_gcp_project=$PROJECT_ID
+export TF_VAR_cluster_name=$CLUSTER_NAME
 
-jx ns jx
-
-echo "*****************************************************"
-echo "**                                                 **"
-echo "**  setting up test resources and garbage collect  **"
-echo "**                                                 **"
-echo "*****************************************************"
-
-jx test delete --test-url $GITOPS_REPO --dir=$GITOPS_DIR --script=$GITOPS_BIN/destroy.sh
+$JX_TEST_COMMAND
