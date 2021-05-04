@@ -5,13 +5,20 @@ spec:
   - name: KUBECONFIG
     value: "/tmp/kubecfg"
   - name: TF_VAR_jx_git_url
-    value: https://bitbucket.beescloud.com/scm/jxbdd/cluster-{{ .Env.TF_VAR_cluster_name }}-dev.git
+    value: https://github.com/jenkins-x-bdd/cluster-{{ .Env.TF_VAR_cluster_name }}-dev.git
   - name: TF_VAR_jx_bot_username
-    value: jenkins-x-bdd
+    value: jenkins-x-bot-bdd
   - name: TF_VAR_jx_bot_token
     valueFrom:
       secretKeyRef:
-        name: bdd-git-bbs
+        name: bdd-git
+        key: password
+  - name: GIT_USERNAME
+    value: jenkins-x-bot-bdd
+  - name: GIT_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: bdd-git
         key: password
 {{- range $pkey, $pval := .Env }}
   - name: {{ $pkey }}
@@ -19,12 +26,12 @@ spec:
 {{- end }}
 
   scmAuthMethods:
-  - host: bitbucket.beescloud.com
+  - host: github.com
     git:
       https:
         requireProxy: false
         tokenSecretRef:
-          name: bdd-git-bbs
+          name: bdd-git
           namespace: jx
           key: password
 
@@ -32,7 +39,7 @@ spec:
   terraformVersion: 3.2.72
 
   terraformModule:
-    address: https://jenkins-x-bdd@bitbucket.beescloud.com/scm/jxbdd/infra-{{ .Env.TF_VAR_cluster_name }}-dev.git
+    address: https://github.com/jenkins-x/learn-terraform-provision-gke-cluster
 
   customBackend: |-
     terraform {
@@ -58,13 +65,6 @@ spec:
 
     echo "Terraform is done!"
 
-    echo "Removing kubernetes resources from state"
-    terraform state rm 'module.jx.module.cluster.helm_release.jx-git-operator[0]'
-    terraform state rm 'module.jx.module.cluster.kubernetes_config_map.jenkins_x_requirements[0]'
-    terraform state rm 'module.jx.module.cluster.module.jx-health[0].helm_release.cluster-checks'
-    terraform state rm 'module.jx.module.cluster.module.jx-health[0].helm_release.health-checks-install'
-    terraform state rm 'module.jx.module.cluster.module.jx-health[0].helm_release.kuberhealthy'
-
     echo "lets connect to the remote cluster"
     $(terraform output -raw connect)
 
@@ -76,18 +76,28 @@ spec:
     # verify we have the correct context
     jx verify ctx -c "gke_${TF_VAR_gcp_project}_us-central1-a_${TF_VAR_cluster_name}"
 
-    echo "lets verify the log completes"
-    jx admin log -b
-    
+    echo "lets setup and install the vault"
+    git clone $TF_VAR_jx_git_url dev-cluster
+    cd dev-cluster/infra
+    ls -al
+    helmfile sync
+    echo  "lets wait for the vault to be running"
+    sleep 30
+    jx secret vault port-forward&
+    jx secret vault wait
+    cd ../..
+
+
+    echo "lets install the operator"
+    jx admin operator --url $TF_VAR_jx_git_url
+
     echo "installing the BDD test"
-    export GIT_KIND="bitbucketserver"
-    export GIT_ORGANISATION="jxbdd"
-    export GIT_SERVER_HOST="bitbucket.beescloud.com"
-    export GIT_SERVER_URL="https://${GIT_SERVER_HOST}"
+    export GIT_ORGANISATION="jenkins-x-bdd"
     export TEST_NAME="test-create-spring"
+    echo "PATH=$PATH"
     helm version
     helm repo add jx3 https://storage.googleapis.com/jenkinsxio/charts
-    helm upgrade --install bdd jx3/jx-bdd  --namespace jx --create-namespace --set bdd.approverSecret="bdd-git-bbs-approver",bdd.kind="$GIT_KIND",bdd.owner="$GIT_ORGANISATION",bdd.gitServerHost="$GIT_SERVER_HOST",bdd.gitServerURL="$GIT_SERVER_URL",command.test="make $TEST_NAME",jxgoTag="$JX_VERSION"
+    helm upgrade --install bdd jx3/jx-bdd  --namespace jx --create-namespace --set bdd.owner="$GIT_ORGANISATION",command.test="make $TEST_NAME",jxgoTag="$JX_VERSION"
 
     echo "about to wait for the BDD test to run"
     sleep 20
