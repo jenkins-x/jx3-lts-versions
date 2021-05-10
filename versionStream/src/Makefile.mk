@@ -155,7 +155,7 @@ pre-build:
 
 
 .PHONY: post-build
-post-build: $(GENERATE_SCHEDULER)
+post-build: annotate-resources $(GENERATE_SCHEDULER)
 
 # lets add the kubectl-apply prune annotations
 #
@@ -240,10 +240,10 @@ regen-check:
 	jx gitops apply
 
 .PHONY: regen-phase-1
-regen-phase-1: git-setup resolve-metadata all $(KUBEAPPLY) annotate-resources verify-ingress-ignore commit
+regen-phase-1: git-setup resolve-metadata all $(KUBEAPPLY) verify-ingress-ignore commit
 
 .PHONY: regen-phase-2
-regen-phase-2: verify-ingress-ignore all verify-ignore report commit
+regen-phase-2: verify-ingress-ignore all verify-ignore commit
 
 .PHONY: regen-phase-3
 regen-phase-3: push secrets-wait
@@ -253,12 +253,16 @@ regen-none:
 # we just merged a PR so lets perform any extra checks after the merge but before the kubectl apply
 
 .PHONY: apply
-apply: regen-check $(KUBEAPPLY) annotate-resources secrets-populate verify apply-completed
+apply: regen-check $(KUBEAPPLY) secrets-populate verify apply-completed status
 
 .PHONY: report
 report:
 # lets generate the markdown and yaml reports in the docs dir
 	jx gitops helmfile report
+
+
+.PHONY: status
+status:
 
 # lets update the deployment status to your git repository (e.g. https://github.com)
 	jx gitops helmfile status
@@ -296,7 +300,7 @@ kapp-apply:
 .PHONY: annotate-resources
 annotate-resources:
 	@echo "annotating some deployments with the latest git SHA: $(GIT_SHA)"
-	kubectl annotate deploy --overwrite -n jx -l git.jenkins-x.io/sha=annotate git.jenkins-x.io/sha=$(GIT_SHA)
+	jx gitops annotate --pod-spec --dir  $(OUTPUT_DIR)/namespaces --kind Deployment --selector git.jenkins-x.io/sha=annotate git.jenkins-x.io/sha=$(GIT_SHA)
 
 .PHONY: resolve-metadata
 resolve-metadata:
@@ -308,12 +312,14 @@ resolve-metadata:
 
 .PHONY: commit
 commit:
+# lets make sure the git user name and email are setup for the commit to ensure we don't attribute this commit to random user
+	jx gitops git setup
 	-git add --all
 # lets ignore commit errors in case there's no changes and to stop pipelines failing
 	-git commit -m "chore: regenerated" -m "/pipeline cancel"
 
 .PHONY: all
-all: clean fetch build lint 
+all: clean fetch report build lint
 
 
 .PHONY: pr
@@ -321,12 +327,7 @@ pr:
 	jx gitops apply --pull-request
 
 .PHONY: pr-regen
-pr-regen: all pr-report commit push-pr-branch
-
-.PHONY: pr-report
-pr-report:
-# lets generate the markdown and yaml reports in the docs dir
-	jx gitops helmfile report
+pr-regen: all commit push-pr-branch
 
 .PHONY: push-pr-branch
 push-pr-branch:
