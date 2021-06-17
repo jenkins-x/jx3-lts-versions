@@ -155,7 +155,7 @@ pre-build:
 
 
 .PHONY: post-build
-post-build: annotate-resources $(GENERATE_SCHEDULER)
+post-build: $(GENERATE_SCHEDULER)
 
 # lets add the kubectl-apply prune annotations
 #
@@ -253,7 +253,7 @@ regen-none:
 # we just merged a PR so lets perform any extra checks after the merge but before the kubectl apply
 
 .PHONY: apply
-apply: regen-check $(KUBEAPPLY) secrets-populate verify apply-completed status
+apply: regen-check $(KUBEAPPLY) secrets-populate verify annotate-resources apply-completed status
 
 .PHONY: report
 report:
@@ -269,6 +269,10 @@ status:
 
 .PHONY: apply-completed
 apply-completed: $(POST_APPLY_HOOK)
+# copy any git operator secrets to the jx namespace
+	jx secret copy --ns jx-git-operator --ignore-missing-to --to jx --selector git-operator.jenkins.io/kind=git-operator
+	jx secret copy --ns jx-git-operator --ignore-missing-to --to tekton-pipelines --selector git-operator.jenkins.io/kind=git-operator
+
 	@echo "completed the boot Job"
 
 .PHONY: failed
@@ -300,7 +304,7 @@ kapp-apply:
 .PHONY: annotate-resources
 annotate-resources:
 	@echo "annotating some deployments with the latest git SHA: $(GIT_SHA)"
-	jx gitops annotate --pod-spec --dir  $(OUTPUT_DIR)/namespaces --kind Deployment --selector git.jenkins-x.io/sha=annotate git.jenkins-x.io/sha=$(GIT_SHA)
+	jx gitops patch --selector git.jenkins-x.io/sha=annotate  --data '{"spec":{"template":{"metadata":{"annotations":{"git.jenkins-x.io/sha": "$(GIT_SHA)"}}}}}'
 
 .PHONY: resolve-metadata
 resolve-metadata:
@@ -332,7 +336,8 @@ pr-regen: all commit push-pr-branch
 .PHONY: push-pr-branch
 push-pr-branch:
 # lets push changes to the Pull Request branch
-	jx gitops pr push --ignore-no-pr
+# we need to force push due to rebasing of PRs after new commits merge to the main branch after the PR is created
+	jx gitops pr push --ignore-no-pr --force
 
 # now lets label the Pull Request so that lighthouse keeper can auto merge it
 	jx gitops pr label --name updatebot --matches "env/.*" --ignore-no-pr
