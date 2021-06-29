@@ -10,6 +10,8 @@ ingress:
     # message to display with an appropriate context why the authentication is required
     nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required - Jenkins X Pipeline Dashboard'
 
+  apiVersion: "networking.k8s.io/v1"
+
   hosts:
   - "dashboard{{ .Values.jxRequirements.ingress.namespaceSubDomain | default "." }}{{ .Values.jxRequirements.ingress.domain | default "cluster.local" }}"
 
@@ -58,12 +60,19 @@ config:
   {{- if hasKey .Values.jxRequirements "storage" }}
   {{- range .Values.jxRequirements.storage }}
   {{- if eq .name "logs" }}
+    {{- /*
+      Cant use urlJoin with the golang template since it will url escape the template, so use urlJoin to inject a token which is replaced later with the template
+      Also, it appears that the log writer clobbers the path part of the url, so lets do the same here
+    */}}w
+    {{- $urlDict := urlParse .url }}
+    {{- $_ := set $urlDict "path" "/___JX_PATH___" }}
+    {{- $url := urlJoin $urlDict }}
   archivedLogsURLTemplate: >-
-    {{ .url }}{{`/jenkins-x/logs/{{.Owner}}/{{.Repository}}/{{if hasPrefix .Branch "pr"}}{{.Branch | upper}}{{else}}{{.Branch}}{{end}}/{{.Build}}.log`}}
+    {{ $url | replace "/___JX_PATH___" `/jenkins-x/logs/{{.Owner}}/{{.Repository}}/{{if hasPrefix .Branch "pr"}}{{.Branch | upper}}{{else}}{{.Branch}}{{end}}/{{.Build}}.log` }}
   archivedPipelinesURLTemplate: >-
-    {{ .url }}{{`/jenkins-x/logs/{{.Owner}}/{{.Repository}}/{{if hasPrefix .Branch "pr"}}{{.Branch | upper}}{{else}}{{.Branch}}{{end}}/{{.Build}}.yaml`}}
+    {{ $url | replace "/___JX_PATH___" `/jenkins-x/logs/{{.Owner}}/{{.Repository}}/{{if hasPrefix .Branch "pr"}}{{.Branch | upper}}{{else}}{{.Branch}}{{end}}/{{.Build}}.yaml` }}
   archivedPipelineRunsURLTemplate: >-
-    {{ .url }}{{`/jenkins-x/pipelineruns/{{.Namespace}}/{{.Name}}.yaml`}}
+    {{ $url | replace "/___JX_PATH___" `/jenkins-x/pipelineruns/{{.Namespace}}/{{.Name}}.yaml` }}
   {{- end }}
   {{- end }}
   {{- end }}
