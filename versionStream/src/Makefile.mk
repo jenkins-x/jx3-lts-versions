@@ -133,7 +133,7 @@ fetch: init $(COPY_SOURCE) $(REPOSITORY_RESOLVE)
 	jx secret replicate --selector secret.jenkins-x.io/replica-source=true
 
 # populate secrets from filesystem definitions
-	-VAULT_ADDR=$(VAULT_ADDR) VAULT_NAMESPACE=$(VAULT_NAMESPACE) jx secret populate --source filesystem --secret-namespace $(VAULT_NAMESPACE)
+#	-VAULT_ADDR=$(VAULT_ADDR) VAULT_NAMESPACE=$(VAULT_NAMESPACE) jx secret populate --source filesystem --secret-namespace $(VAULT_NAMESPACE)
 
 # lets make sure all the namespaces exist for environments of the replicated secrets
 	jx gitops namespace --dir-mode --dir $(OUTPUT_DIR)/namespaces
@@ -155,7 +155,7 @@ pre-build:
 
 
 .PHONY: post-build
-post-build: annotate-resources $(GENERATE_SCHEDULER)
+post-build: $(GENERATE_SCHEDULER)
 
 # lets add the kubectl-apply prune annotations
 #
@@ -224,6 +224,7 @@ secrets-populate:
 # they can be modified/regenerated at any time via `jx secret edit`
 	-VAULT_ADDR=$(VAULT_ADDR) VAULT_NAMESPACE=$(VAULT_NAMESPACE) jx secret populate --secret-namespace $(VAULT_NAMESPACE)
 
+
 .PHONY: secrets-wait
 secrets-wait:
 # lets wait for the ExternalSecrets service to populate the mandatory Secret resources
@@ -246,14 +247,14 @@ regen-phase-1: git-setup resolve-metadata all $(KUBEAPPLY) verify-ingress-ignore
 regen-phase-2: verify-ingress-ignore all verify-ignore commit
 
 .PHONY: regen-phase-3
-regen-phase-3: push secrets-wait
+regen-phase-3: push secrets-populate secrets-wait
 
 .PHONY: regen-none
 regen-none:
 # we just merged a PR so lets perform any extra checks after the merge but before the kubectl apply
 
 .PHONY: apply
-apply: regen-check $(KUBEAPPLY) secrets-populate verify apply-completed status
+apply: regen-check $(KUBEAPPLY) verify annotate-resources apply-completed status
 
 .PHONY: report
 report:
@@ -269,6 +270,10 @@ status:
 
 .PHONY: apply-completed
 apply-completed: $(POST_APPLY_HOOK)
+# copy any git operator secrets to the jx namespace
+	jx secret copy --ns jx-git-operator --ignore-missing-to --to jx --selector git-operator.jenkins.io/kind=git-operator
+	jx secret copy --ns jx-git-operator --ignore-missing-to --to tekton-pipelines --selector git-operator.jenkins.io/kind=git-operator
+
 	@echo "completed the boot Job"
 
 .PHONY: failed
@@ -300,7 +305,7 @@ kapp-apply:
 .PHONY: annotate-resources
 annotate-resources:
 	@echo "annotating some deployments with the latest git SHA: $(GIT_SHA)"
-	jx gitops annotate --pod-spec --dir  $(OUTPUT_DIR)/namespaces --kind Deployment --selector git.jenkins-x.io/sha=annotate git.jenkins-x.io/sha=$(GIT_SHA)
+	jx gitops patch --selector git.jenkins-x.io/sha=annotate  --data '{"spec":{"template":{"metadata":{"annotations":{"git.jenkins-x.io/sha": "$(GIT_SHA)"}}}}}'
 
 .PHONY: resolve-metadata
 resolve-metadata:
@@ -332,7 +337,8 @@ pr-regen: all commit push-pr-branch
 .PHONY: push-pr-branch
 push-pr-branch:
 # lets push changes to the Pull Request branch
-	jx gitops pr push --ignore-no-pr
+# we need to force push due to rebasing of PRs after new commits merge to the main branch after the PR is created
+	jx gitops pr push --ignore-no-pr --force
 
 # now lets label the Pull Request so that lighthouse keeper can auto merge it
 	jx gitops pr label --name updatebot --matches "env/.*" --ignore-no-pr
