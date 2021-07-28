@@ -6,6 +6,7 @@ set -e
 echo "promoting changes in jx3-gitops-template to downstream templates"
 
 declare -a repos=(
+  # disabled  "jx3-kind"
   # local
   "jx3-kubernetes" "jx3-kubernetes-production" "jx3-kubernetes-bbc" "jx3-kubernetes-istio" "jx3-kubernetes-minio" "jx3-kubernetes-vault" "jx3-kind" "jx3-kind-gitea" "jx3-minikube" "jx3-docker-vault"
   # GKE
