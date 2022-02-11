@@ -7,7 +7,7 @@ echo "promoting changes in jx3-gitops-template to downstream templates"
 
 declare -a repos=(
   # vanilla
-  "jx3-kubernetes" "jx3-kubernetes-production" "jx3-kubernetes-bbc" "jx3-kubernetes-istio" "jx3-kubernetes-minio" "jx3-kubernetes-vault" "jx3-kind" "jx3-kind-gitea" "jx3-minikube" "jx3-docker-vault"
+  "jx3-kubernetes" "jx3-kubernetes-production" "jx3-kubernetes-bbc" "jx3-kubernetes-istio" "jx3-kubernetes-minio" "jx3-kubernetes-vault" "jx3-kind" "jx3-kind-gitea" "jx3-minikube" "jx3-docker-vault" "jx3-k3s-vault"
   # GKE
   "jx3-gke-vault" "jx3-gke-gsm" "jx3-gke-gsm-gitea" "jx3-gke-gcloud-vault"
   # EKS
@@ -64,8 +64,8 @@ done
 # lets upgarde our own infra automatically
 LOCAL_BRANCH_NAME="jx-vs_$VERSION"
 cd $TMPDIR
-git clone https://github.com/jenkins-x/jx3-eagle.git
-cd "jx3-eagle"
+git clone https://github.com/jenkins-x/jx3-oss-cluster.git
+cd "jx3-oss-cluster"
 git checkout -b $LOCAL_BRANCH_NAME
 jx gitops upgrade --commit-message "chore: version stream upgrade $VERSION"
 git push origin $LOCAL_BRANCH_NAME
