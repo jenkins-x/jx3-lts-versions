@@ -7,6 +7,7 @@ on:
   # - cron: '0 0 * * *'
 jobs:
   issue:
+    if: github.repository_owner == 'jenkins-x'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
