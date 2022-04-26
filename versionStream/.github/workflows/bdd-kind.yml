@@ -6,6 +6,7 @@ on:
   # pull_request:
 jobs:
   kind:
+    if: github.repository_owner == 'jenkins-x'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
