@@ -91,7 +91,7 @@ export TERRAFORM_INPUT="-input=false"
 # ensure buckets are cleaned up for CI
 export TF_VAR_force_destroy=true
 
-export PROJECT_ID=jenkins-x-labs-bdd1
+export PROJECT_ID=jenkins-x-bdd-326715
 export CREATED_TIME=$(date '+%a-%b-%d-%Ybin/ main.tf values.auto.tfvars terraform.tfstate variables.tf-%H-%M-%S')
 export CLUSTER_NAME="${BRANCH_NAME,,}-$BUILD_NUMBER-$BDD_NAME"
 export ZONE=europe-west1-c
@@ -238,3 +238,10 @@ export TF_VAR_gcp_project=$PROJECT_ID
 export TF_VAR_cluster_name=$CLUSTER_NAME
 
 $JX_TEST_COMMAND
+
+# Needs a new token to delete repo
+# $JX_SCM auth refresh -h github.com -s delete_repo
+# echo "Deleting cluster git repo: ${GH_HOST}${GH_OWNER}/cluster-$CLUSTER_NAME-dev"
+# $JX_SCM repo delete ${GH_HOST}${GH_OWNER}/cluster-$CLUSTER_NAME-dev --confirm
+# echo "Deleting infra repo: ${GH_HOST}${GH_OWNER}/infra-$CLUSTER_NAME-dev"
+# $JX_SCM repo delete ${GH_HOST}${GH_OWNER}/infra-$CLUSTER_NAME-dev --confirm
