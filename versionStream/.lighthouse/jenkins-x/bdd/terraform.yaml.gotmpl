@@ -6,6 +6,10 @@ spec:
     value: "/tmp/kubecfg"
   - name: TF_VAR_jx_git_url
     value: https://github.com/jenkins-x-bdd/cluster-{{ .Env.TF_VAR_cluster_name }}-dev.git
+  - name: TF_VAR_node_preemptible
+    value: "true"
+  - name: TF_VAR_kuberhealthy
+    value: "false"
   - name: TF_VAR_jx_bot_username
     value: jenkins-x-bot-bdd
   - name: TF_VAR_jx_bot_token
@@ -29,7 +33,7 @@ spec:
           key: password
 
   terraformRunner: ghcr.io/jenkins-x/terraform-operator-gcp
-  terraformVersion: 3.2.188
+  terraformVersion: 3.2.366
 
   terraformModule:
     address: https://github.com/jenkins-x-bdd/infra-{{ .Env.TF_VAR_cluster_name }}-dev
@@ -61,9 +65,9 @@ spec:
     echo "Removing kubernetes resources from state"
     terraform state rm 'module.jx.module.cluster.helm_release.jx-git-operator[0]'
     terraform state rm 'module.jx.module.cluster.kubernetes_config_map.jenkins_x_requirements[0]'
-    terraform state rm 'module.jx.module.cluster.module.jx-health[0].helm_release.cluster-checks'
-    terraform state rm 'module.jx.module.cluster.module.jx-health[0].helm_release.health-checks-install'
-    terraform state rm 'module.jx.module.cluster.module.jx-health[0].helm_release.kuberhealthy'
+    terraform state rm 'module.jx.module.cluster.module.jx-health[0].helm_release.cluster-checks' || echo "Resource does not exist"
+    terraform state rm 'module.jx.module.cluster.module.jx-health[0].helm_release.health-checks-install' || echo "Resource does not exist"
+    terraform state rm 'module.jx.module.cluster.module.jx-health[0].helm_release.kuberhealthy' || echo "Resource does not exist"
 
     echo "lets connect to the remote cluster"
     $(terraform output -raw connect)
@@ -83,8 +87,8 @@ spec:
     export GIT_ORGANISATION="jenkins-x-bdd"
     export TEST_NAME="test-create-spring"
     helm version
-    helm repo add jx3 https://jenkins-x-charts.github.io/repo
-    helm upgrade --install bdd jx3/jx-bdd  --namespace jx --create-namespace --set bdd.owner="$GIT_ORGANISATION",command.test="make $TEST_NAME",jxgoTag="$JX_VERSION"
+    helm repo add jxgh https://jenkins-x-charts.github.io/repo
+    helm upgrade --install bdd jxgh/jx-bdd  --namespace jx --create-namespace --set bdd.owner="$GIT_ORGANISATION",command.test="make $TEST_NAME",jxgoTag="$JX_VERSION"
 
     echo "about to wait for the BDD test to run"
     sleep 20
