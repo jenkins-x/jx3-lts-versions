@@ -1,6 +1,6 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
-metadata:
+metadata: # kpt-merge: /jx-boot-job
   name: jx-boot-job
 subjects:
 - kind: ServiceAccount

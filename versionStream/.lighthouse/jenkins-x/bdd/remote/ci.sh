@@ -17,7 +17,7 @@ export GH_EMAIL="jenkins-x@googlegroups.com"
 export GH_OWNER="jenkins-x-bdd"
 
 export CREATED_TIME=$(date '+%a-%b-%d-%Y-%H-%M-%S')
-export PROJECT_ID=jenkins-x-labs-bdd1
+export PROJECT_ID=jenkins-x-bdd-326715
 export CLUSTER_NAME="${BRANCH_NAME,,}-$BUILD_NUMBER-bdd-remote"
 export ZONE=europe-west1-c
 export LABELS="branch=${BRANCH_NAME,,},cluster=bdd-remote,create-time=${CREATED_TIME,,}"
@@ -104,7 +104,7 @@ gcloud container clusters get-credentials $STAGING_CLUSTER_NAME --zone $ZONE --p
 
 
 jx ns jx-staging
-jx ctx -b
+jx ns -b
 
 jxl boot create -b --env staging -b --version-stream-ref=$PULL_PULL_SHA --env-git-owner=$GH_OWNER --project=$PROJECT_ID --cluster=$CLUSTER_NAME --zone=$ZONE --git-url=$STAGING_GIT_URL
 
@@ -116,7 +116,7 @@ jxl boot run -b --job
 echo "SWITCH: to dev cluster: $STAGING_CLUSTER_NAME to start BDD tests"
 gcloud container clusters get-credentials $DEV_CLUSTER_NAME --zone $ZONE --project $PROJECT_ID
 jx ns jx
-jx ctx -b
+jx ns -b
 
 # for some reason we need to use the full name once for the second command to work!
 kubectl get environments

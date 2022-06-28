@@ -1,6 +1,6 @@
 apiVersion: gitops.jenkins-x.io/v1alpha1
 kind: Scheduler
-metadata:
+metadata: # kpt-merge: /in-repo
   name: in-repo
 spec:
   approve:
@@ -19,63 +19,62 @@ spec:
       skip-unknown-contexts: false
     pr_status_base_url: ""
     squash_label: ""
-    target_url: http://lighthouse{{ .Requirements.ingress.namespaceSubDomain }}{{
-      .Requirements.ingress.domain }}/merge/status
+    target_url: http://lighthouse{{ .Requirements.ingress.namespaceSubDomain }}{{ .Requirements.ingress.domain }}/merge/status
   # lets look in the source repository for trigger files
   in_repo: true
   plugins:
     entries:
-    - approve
-    - assign
-    - blunderbuss
-    - help
-    - hold
-    - lgtm
-    - lifecycle
-    - override
-    - size
-    - trigger
-    - wip
-    - heart
-    - cat
-    - dog
-    - pony
+      - approve
+      - assign
+      - blunderbuss
+      - help
+      - hold
+      - lgtm
+      - lifecycle
+      - override
+      - size
+      - trigger
+      - wip
+      - heart
+      - cat
+      - dog
+      - pony
   external_plugins:
     Replace: true
     entries:
-    - name: cd-indicators
-      endpoint: "http://cd-indicators.jx.svc.cluster.local/lighthouse/events"
-    - name: lighthouse-webui-plugin
-      endpoint: "http://lighthouse-webui-plugin.jx.svc.cluster.local/lighthouse/events"
+      - name: cd-indicators
+        endpoint: "http://cd-indicators.jx.svc.cluster.local/lighthouse/events"
+      - name: lighthouse-webui-plugin
+        endpoint: "http://lighthouse-webui-plugin.jx.svc.cluster.local/lighthouse/events"
   queries:
-  - excludedBranches: {}
-    included_branches: {}
-    labels:
-      entries:
-      - approved
-    milestone: ""
-    missingLabels:
-      entries:
-      - do-not-merge
-      - do-not-merge/hold
-      - do-not-merge/work-in-progress
-      - needs-ok-to-test
-      - needs-rebase
-    review_approved_required: false
-  - excludedBranches: {}
-    included_branches: {}
-    labels:
-      entries:
-      - updatebot
-    milestone: ""
-    missingLabels:
-      entries:
-      - do-not-merge
-      - do-not-merge/hold
-      - do-not-merge/work-in-progress
-      - needs-ok-to-test
-      - needs-rebase
-    review_approved_required: false
+    - excludedBranches: {}
+      included_branches: {}
+      labels:
+        entries:
+          - approved
+      milestone: ""
+      missingLabels:
+        entries:
+          - do-not-merge
+          - do-not-merge/hold
+          - do-not-merge/work-in-progress
+          - needs-ok-to-test
+          - needs-rebase
+      review_approved_required: false
+    - excludedBranches: {}
+      included_branches: {}
+      labels:
+        entries:
+          - updatebot
+      milestone: ""
+      missingLabels:
+        entries:
+          - do-not-merge
+          - do-not-merge/hold
+          - do-not-merge/work-in-progress
+          - needs-ok-to-test
+          - needs-rebase
+      review_approved_required: false
   policy:
     protect_tested: true
   schedulerAgent:
@@ -86,4 +85,4 @@ spec:
     only_org_members: false
     trusted_org: todo
   welcome:
-  - message_template: Welcome
+    - message_template: Welcome

@@ -16,5 +16,8 @@ export TF_VAR_gsm=true
 
 ## cleanup secrets in google secrets manager if it was enabled
 export CLUSTER_NAME="${BRANCH_NAME,,}-$BUILD_NUMBER-$BDD_NAME"
-export PROJECT_ID=jenkins-x-labs-bdd1
+export PROJECT_ID=jenkins-x-bdd-326715
 gcloud secrets list --project $PROJECT_ID --format='get(NAME)' --limit=unlimited --filter=$CLUSTER_NAME | xargs -I {arg} gcloud secrets delete  "{arg}" --quiet
+
+## Clean up service accounts
+gcloud iam service-accounts list --project $PROJECT_ID --format='get(EMAIL)' --limit=unlimited --filter=$CLUSTER_NAME | xargs -I {arg} gcloud iam service-accounts delete "{arg}" --quiet
