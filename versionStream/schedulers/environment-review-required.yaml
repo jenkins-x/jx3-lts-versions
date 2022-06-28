@@ -19,8 +19,7 @@ spec:
       skip-unknown-contexts: false
     pr_status_base_url: ""
     squash_label: ""
-    target_url: http://lighthouse{{ .Requirements.ingress.namespaceSubDomain }}{{
-      .Requirements.ingress.domain }}/merge/status
+    target_url: http://lighthouse{{ .Requirements.ingress.namespaceSubDomain }}{{ .Requirements.ingress.domain }}/merge/status
   plugins:
     entries:
     - config-updater

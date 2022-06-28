@@ -1,16 +1,14 @@
 {
-
-  "credHelpers": {
-      "gcr.io": "gcr",
-      "us.gcr.io": "gcr",
-      "eu.gcr.io": "gcr",
-      "asia.gcr.io": "gcr",
-      "staging-k8s.gcr.io": "gcr"
-  },
-
-  "auths":{
+  "auths": {
     "ghcr.io": {
-        "auth": "Z2l0b3BlcmF0b3JVc2VybmFtZTpnaXRvcGVyYXRvcnBhc3N3b3Jk"
+      "auth": "Z2l0b3BlcmF0b3JVc2VybmFtZTpnaXRvcGVyYXRvcnBhc3N3b3Jk"
     }
+  },
+  "credHelpers": {
+    "asia.gcr.io": "gcr",
+    "eu.gcr.io": "gcr",
+    "gcr.io": "gcr",
+    "staging-k8s.gcr.io": "gcr",
+    "us.gcr.io": "gcr"
   }
 }

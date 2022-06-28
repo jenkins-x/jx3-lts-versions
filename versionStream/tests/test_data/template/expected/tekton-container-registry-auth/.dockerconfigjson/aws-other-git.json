@@ -1,7 +1,4 @@
 {
-
-  "credsStore": "ecr-login",
-
-  "auths":{
-  }
+  "auths": {},
+  "credsStore": "ecr-login"
 }
